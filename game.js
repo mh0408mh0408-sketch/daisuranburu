@@ -216,7 +216,7 @@ function getPlayerColor(pid) {
 }
 
 function defaultStatus() {
-  return { invincibleTurns:0, poisonCounter:false, echoActive:false,
+  return { invincibleTurns:0, poisonCounter:false, echoActive:false, echoTurns:0,
            dominanceActive:false, rivalRolls:null };
 }
 
@@ -476,8 +476,8 @@ async function showDiceRollAnim(die, roll, skipBroadcast=false) {
       overlay.addEventListener('click', handler);
     });
   } else {
-    if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '相手がダイスを振っています...'; }
-    await delay(1200);
+    if (hintEl) { hintEl.style.display = 'none'; }
+    await delay(100);
   }
 
   if (hintEl) hintEl.style.display = 'none';
@@ -940,7 +940,7 @@ EH['echo']=async(die,roll,ctx,isEcho=false)=>{
   const players=await getPlayers(); const me=players[ctx.userId];
   const curMult = me?.status?.echoMultiplierActive || 1;
   const nextMult = curMult === 1 ? 2 : curMult * 2;
-  await setPlayerField(ctx.userId,{'status/echoActive':true, 'status/echoMultiplierActive':nextMult});
+  await setPlayerField(ctx.userId,{'status/echoActive':true, 'status/echoMultiplierActive':nextMult, 'status/echoTurns':2});
   await showSubtitle(`🏔️ やまびこ: 以降の効果 ${nextMult} 倍！`, 'effect');
   pushPopup(`🏔️ やまびこ: このターンのバフ・デバフが ${nextMult} 倍に増幅！`,'effect');await addLog(`🏔️ やまびこx${nextMult}`,'effect');
 };
@@ -1127,12 +1127,15 @@ async function doStartPhase() {
   const bdDie = {cid:'normal', name:'バリア回復(1d6)'};
   await showDiceRollAnim(bdDie, bRecov);
 
+  const et = Math.max(0, (me.status?.echoTurns || 0) - 1);
+  const echoKeep = et > 0;
   await setPlayerField(myPlayerId,{
     barrier: newBarrier,
     'status/invincibleTurns':invT,
     'status/rivalRolls':null,
-    'status/echoActive':false,
-    'status/echoMultiplierActive': 1
+    'status/echoTurns': et,
+    'status/echoActive': echoKeep ? me.status.echoActive : false,
+    'status/echoMultiplierActive': echoKeep ? me.status.echoMultiplierActive : 1
   });
 
   await showSubtitle(`🛡️ ターン開始: バリアが ${bRecov} 回復！`, 'barrier');
@@ -1454,7 +1457,8 @@ function setupRoomListeners() {
     const raw=snap.val();
     myHand=(raw?(Array.isArray(raw)?raw:Object.values(raw)):[]).filter(x=>x!=null);
     renderSelf();
-    if(isMyTurnActive)renderHand(true);else renderHand(false);
+    if(localMeta?.status === 'mulligan') renderMulliganHand();
+    else if(isMyTurnActive)renderHand(true);else renderHand(false);
   });
 
   // ─ ゲームステート

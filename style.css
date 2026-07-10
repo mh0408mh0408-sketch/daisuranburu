@@ -951,3 +951,12 @@ body.screen-shake { animation: screenShake .4s ease; }
 .catalog-faces-text { font-family: var(--font-num); font-size: .58rem; color: var(--text-dim); margin-bottom: .28rem; }
 .catalog-desc { font-size: .72rem; color: var(--text-secondary); line-height: 1.5; }
 .catalog-hidden { display: none !important; }
+.self-status-list { display: flex; align-items: center; gap: .5rem; padding-left: 10px; flex-wrap: wrap; }
+.st-icon { position: relative; display: inline-block; font-size: 1.2rem; margin-right: .3rem; }
+.st-badge {
+  position: absolute; bottom: -4px; right: -6px; background: var(--bg-card); color: var(--text-main);
+  font-size: 0.6rem; font-weight: bold; padding: 1px 4px; border-radius: 6px; border: 1px solid var(--border-color);
+  font-family: var(--font-num); line-height: 1;
+}
+.opp-status .st-icon { font-size: .8rem; margin-right: .2rem; }
+.opp-status .st-badge { font-size: 0.5rem; bottom: -2px; right: -4px; padding: 0 3px; }

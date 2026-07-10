@@ -76,7 +76,7 @@ const DC = {
   double_heal: { name:'ダブルヒールダイス',  rarity:'rare',   icon:'💞', faces:[1,2,3,4,5,6], kind:'heal',
                  desc:'自分と次のプレイヤーの両方を出目分回復する（上限10）', flavor:'回復の独り占め禁止' },
   poison_heal: { name:'毒ヒールダイス',      rarity:'rare',   icon:'☠️', faces:[1,2,3,4,5,6], kind:'heal',
-                 desc:'出目分回復。次のターンまでに攻撃してきた相手に3ダメージ（毒カウンター）', flavor:'可愛いものには毒がある。' },
+                 desc:'出目分回復。次の自分のターンまでに攻撃してきた相手に3ダメージ（毒カウンター・1ターン継続）', flavor:'可愛いものには毒がある。' },
   ex_heal:     { name:'EXヒールダイス',      rarity:'rare',   icon:'💊', faces:[1,2,3,4,5,6], kind:'heal',
                  desc:'出目分回復。さらにヒールダイスをこのターンのアクションに追加する', flavor:'破壊されても1回耐えるダイス' },
   barrier_heal:{ name:'バリアヒールダイス',  rarity:'rare',   icon:'🛡️', faces:[1,2,3,4,5,6], kind:'heal',
@@ -84,21 +84,21 @@ const DC = {
   compress:    { name:'圧縮のダイス',        rarity:'hero',   icon:'🗜️', faces:[1,2,3,4,5,6], kind:'special',
                  desc:'プレイヤーを1人選ぶ。その手札の全ダイスの4以上の出目をランダムな1〜3に置き換える', flavor:'石炭を握りしめ、金剛石にする握力' },
   thornify:    { name:'トゲ付けダイス',      rarity:'hero',   icon:'🌿', faces:[1,2,3,4,5,6], kind:'special',
-                 desc:'手持ちの全ダイス（これを含む）に「+3ダメージ&自-1HP」効果を付与する', flavor:'トゲ付きトゲ付きダイスなんか作っちゃいけないよ' },
+                 desc:'手持ちの全ダイス（これを含む）に「+3ダメージ&自-1HP」効果を付与する（使用するまで永続）', flavor:'トゲ付きトゲ付きダイスなんか作っちゃいけないよ' },
   bomb:        { name:'爆弾ダイス',          rarity:'hero',   icon:'💣', faces:[3,3,3,3,3,3], kind:'attack',
                  desc:'全プレイヤー（自分含む）に3の通常ダメージを与える', flavor:'ダイスじゃなくてただの爆弾' },
   rival:       { name:'同担拒否ダイス',      rarity:'hero',   icon:'💢', faces:[1,2,3,4,5,6], kind:'special',
-                 desc:'出目を記録。次の自分のターンまでに同じ出目を出した相手に6ダメージ', flavor:'貴方が7推しだったら良かったのに' },
+                 desc:'出目を記録。次の自分のターン開始までに同じ出目を出した相手に6ダメージ（1ターン継続）', flavor:'貴方が7推しだったら良かったのに' },
   echo:        { name:'やまびこダイス',      rarity:'hero',   icon:'🏔️', faces:[1,2,3,4,5,6], kind:'special',
-                 desc:'次の自分のターンのダイス効果（バフ・デバフのみ）を2回発動する', flavor:'やまびこをやまびこするのはデバッガーの仕事' },
+                 desc:'次の自分のターンのダイス効果（バフ・デバフのみ）を2回発動する（次のターン終了まで継続）', flavor:'やまびこをやまびこするのはデバッガーの仕事' },
   gamble_heal: { name:'ギャンブルヒールダイス', rarity:'hero', icon:'🎰', faces:[1,2,3,4,5,6], kind:'heal',
                  desc:'ダイスを3個振り、合計値にHPを変更する。上限10を突破できる', flavor:'ピンゾロを出したら勝ちでいいよ' },
   inv_heal:    { name:'無敵ヒールダイス',    rarity:'hero',   icon:'✨', faces:[1,1,1,1,4,4], kind:'special',
-                 desc:'4が出たら1ターン間無敵状態（通常ダメージ無効）になる。1は効果なし', flavor:'無敵だが、敵に直接触れて倒すことはできない' },
+                 desc:'4が出たら無敵状態（通常ダメージ無効）になる（次のターン開始時まで1ターン継続）。1は効果なし', flavor:'無敵だが、敵に直接触れて倒すことはできない' },
   dominance:   { name:'下克上ダイス',        rarity:'legend', icon:'👑', faces:[1,2,3,1,2,3], kind:'attack',
-                 desc:'1〜3のダメージ後、下克上状態に。以降ダイスを振るたびに1〜3で再発動（最大4回追加、4以上で終了）', flavor:'' },
+                 desc:'1〜3のダメージ後、下克上状態に（発動ターンと次ターンまで計2ターン継続）。以降ダイスを振るたびに1〜3で再発動（最大4回追加）、4以上で失敗して効果終了', flavor:'力こそパワー' },
   accumulate:  { name:'蓄積のダイス',        rarity:'legend', icon:'📦', faces:[1,2,3,4,5,6], kind:'special',
-                 desc:'2〜6: 出目分スタックを積み手持ちに戻る。1: スタック分のダメージを放出する', flavor:'いきなり「1」は出すなよ！！絶対に出すなよ！！' },
+                 desc:'2〜6: 出目分スタックを積み手持ちに戻る。1: 全スタック分の貫通ダメージを放出し消費する', flavor:'いきなり「1」は出すなよ！！絶対に出すなよ！！' },
   break_die:   { name:'ブレイクダイス',      rarity:'legend', icon:'💥', faces:[1,2,3,4,5,6], kind:'special',
                  desc:'自分以外の全プレイヤーのバリアを最大3まで破壊し、破壊した分のダメージを与える', flavor:'◾︎T・ブレイカー' },
   sudden_death:{ name:'サドンデスダイス',    rarity:'special', icon:'🔥', faces:[1,2,3,1,2,3], kind:'special',
@@ -217,7 +217,7 @@ function getPlayerColor(pid) {
 
 function defaultStatus() {
   return { invincibleTurns:0, poisonCounter:false, echoActive:false, echoTurns:0,
-           dominanceActive:false, rivalRolls:null };
+           dominanceActive:false, dominanceTurns:0, rivalRolls:null };
 }
 
 // ================================================================
@@ -587,16 +587,16 @@ function renderOpponents() {
 
 function statusIcons(st) {
   const list=[];
-  if ((st.invincibleTurns||0)>0) list.push({i:'✨',t:`無敵(${st.invincibleTurns}T)`});
-  if (st.poisonCounter)           list.push({i:'☠️',t:'毒カウンター'});
-  if (st.echoActive)              list.push({i:'🏔️',t:'やまびこ'});
-  if (st.dominanceActive)         list.push({i:'👑',t:'下克上状態'});
+  if ((st.invincibleTurns||0)>0) list.push({i:`<span class="st-icon">✨<span class="st-badge">${st.invincibleTurns}</span></span>`,t:`無敵(${st.invincibleTurns}T)`});
+  if (st.poisonCounter)           list.push({i:'<span class="st-icon">☠️</span>',t:'毒カウンター'});
+  if (st.echoActive)              list.push({i:`<span class="st-icon">🏔️<span class="st-badge">${st.echoTurns||0}</span></span>`,t:`やまびこ(残り${st.echoTurns||0}T)`});
+  if (st.dominanceActive)         list.push({i:`<span class="st-icon">👑<span class="st-badge">${st.dominanceTurns||0}</span></span>`,t:`下克上状態(残り${st.dominanceTurns||0}T)`});
   if (st.rivalRolls) {
     for (const [r, c] of Object.entries(st.rivalRolls)) {
-      if (c > 0) list.push({i:'💢',t:`同担(${r})x${c}`});
+      if (c > 0) list.push({i:`<span class="st-icon">💢<span class="st-badge">${c}</span></span>`,t:`同担(${r})x${c}`});
     }
   } else if (st.rivalRoll!=null) {
-    list.push({i:'💢',t:`同担(${st.rivalRoll})`});
+    list.push({i:'<span class="st-icon">💢</span>',t:`同担(${st.rivalRoll})`});
   }
   return list;
 }
@@ -641,6 +641,12 @@ function renderSelf() {
   const hc=document.getElementById('self-hand-count'); if (hc) hc.textContent=myHand.length;
   const sa=document.querySelector('.self-area');
   if (sa) sa.classList.toggle('invincible-aura',(me.status?.invincibleTurns||0)>0);
+
+  const sl = document.getElementById('self-status-list');
+  if (sl) {
+    const icons = statusIcons(me.status || {});
+    sl.innerHTML = icons.map(s => `<span title="${s.t}">${s.i}</span>`).join('');
+  }
 }
 
 function renderHand(selectable=false) {
@@ -969,7 +975,7 @@ EH['dominance']=async(die,roll,ctx,isEcho=false)=>{
   await applyDamage(ctx.targetId,roll);
   // 下克上状態をセット（初回のみ。executeDiceWithDominance内で再発動ループが動く）
   if(!isEcho) {
-    await setPlayerField(ctx.userId,{'status/dominanceActive':true});
+    await setPlayerField(ctx.userId,{'status/dominanceActive':true, 'status/dominanceTurns':2});
     pushPopup(`👑 下克上発動！(${roll}ダメ) 最大4回再発動します！`,'effect');
     await addLog(`👑 下克上: ${roll}ダメ`,'effect');
   } else {
@@ -1004,8 +1010,7 @@ EH['accumulate']=async(die,roll,ctx,isEcho=false)=>{
     // 手札から削除（使用時にすでに手札から抜いてあるのでなにもしない）
     // useSelectedDice内で先にこのダイスを手札から削除済みなので、ここでは手札に戻さないでそのまま
   } else {
-    // 2~6が出たら: スタックを積んで手札に戻る
-    await applyDamage(ctx.targetId, roll);
+    // 2~6出目: スタックを変えて手札に戻る
     const newStack = currentStack + roll;
     if(!isEcho) await showSubtitle(`📦 スタック+${roll} (計${newStack}) 手札へ！`, 'effect');
     pushPopup(`📦 蓄積: [${roll}] スタック→${newStack}！手持ちに戻る`,'effect');
@@ -1072,12 +1077,13 @@ async function executeOneDie(die,ctx) {
   await checkRivalWatch(roll);
   
   const handler=EH[die.cid];
-  const me = localPlayers[myPlayerId];
+  const meSnap = await R('players', myPlayerId).once('value');
+  const me = meSnap.val();
   
   if (me?.status?.dominanceActive && roll >= 4) {
-    await showSubtitle(`👑 [${roll}] 4以上→失敗！`, 'system');
-    pushPopup(`👑 下克上中: [${roll}] 4以上のためダイス失敗`,'system');
-    await addLog(`👑 下克上失敗: ${roll}`,'system');
+    await showSubtitle(`☠️ [${roll}] 4以上で失敗！`, 'system');
+    pushPopup(`☠️ 下克中: [${roll}] 4以上のためダイス失敗`,'system');
+    await addLog(`☠️ 下克失敗: ${roll}`,'system');
     return roll;
   }
 
@@ -1129,13 +1135,18 @@ async function doStartPhase() {
 
   const et = Math.max(0, (me.status?.echoTurns || 0) - 1);
   const echoKeep = et > 0;
+  const dt = Math.max(0, (me.status?.dominanceTurns || 0) - 1);
+  const domKeep = dt > 0;
+
   await setPlayerField(myPlayerId,{
     barrier: newBarrier,
     'status/invincibleTurns':invT,
     'status/rivalRolls':null,
     'status/echoTurns': et,
     'status/echoActive': echoKeep ? me.status.echoActive : false,
-    'status/echoMultiplierActive': echoKeep ? me.status.echoMultiplierActive : 1
+    'status/echoMultiplierActive': echoKeep ? me.status.echoMultiplierActive : 1,
+    'status/dominanceTurns': dt,
+    'status/dominanceActive': domKeep ? me.status.dominanceActive : false
   });
 
   await showSubtitle(`🛡️ ターン開始: バリアが ${bRecov} 回復！`, 'barrier');
@@ -1175,7 +1186,6 @@ async function useSelectedDice() {
 
 
   const ctx={userId:myPlayerId,targetId:getDefaultTarget(),turnState:{bowUsed:false,extraDraft:false,exHealBonus:false},_thornDone:false,echoMode:false,_accumReturnedToHand:null};
-  const inDominance=localPlayers[myPlayerId]?.status?.dominanceActive;
 
   for(const iid of iidsToExecute){
     // フェッチし直して最新状態（トゲ付与など）を取得
@@ -1191,7 +1201,10 @@ async function useSelectedDice() {
     hand = hand.filter(d=>d.iid!==iid);
     await setHand(myPlayerId,hand); myHand=hand; renderHand(false);
 
-    await addLog(`── ${DC[die.cid]?.name} 使用 ──`,'system');
+    const curMeSnap = await R('players', myPlayerId).once('value');
+    const inDominance = curMeSnap.val()?.status?.dominanceActive;
+
+    await addLog(`▶ ${DC[die.cid]?.name} 使用 ◀`,'system');
     if(inDominance&&die.cid!=='dominance')await executeDiceWithDominance(die,ctx);
     else await executeOneDie(die,ctx);
 
@@ -1521,10 +1534,11 @@ function renderLobbyPlayers() {
 // マリガン
 // ================================================================
 let mulliganPicks=[];
+let isMulliganComplete=false;
 
 async function initMulliganScreen() {
   if(document.getElementById('screen-mulligan').classList.contains('active'))return;
-  showScreen('screen-mulligan');myHand=await getHand(myPlayerId);mulliganPicks=[];renderMulliganHand();
+  showScreen('screen-mulligan');myHand=await getHand(myPlayerId);mulliganPicks=[];isMulliganComplete=false;renderMulliganHand();
 }
 
 function renderMulliganHand() {
@@ -1532,6 +1546,7 @@ function renderMulliganHand() {
   for(const die of myHand){
     const sel=mulliganPicks.includes(die.iid);const card=renderDiceCard(die,{selectable:true,selected:sel});
     card.addEventListener('click',()=>{
+      if(isMulliganComplete)return;
       if(mulliganPicks.includes(die.iid)) mulliganPicks=mulliganPicks.filter(i=>i!==die.iid);
       else mulliganPicks.push(die.iid);
       document.getElementById('btn-mulligan-swap').disabled=mulliganPicks.length===0;
@@ -1542,6 +1557,8 @@ function renderMulliganHand() {
 }
 
 async function completeMulligan(swap) {
+  if(isMulliganComplete)return;
+  isMulliganComplete=true;
   document.getElementById('btn-mulligan-swap').disabled=true;document.getElementById('btn-mulligan-skip').disabled=true;
   if(swap&&mulliganPicks.length>0){
     myHand=myHand.map(d=>{

@@ -90,7 +90,7 @@ const DC = {
   rival:       { name:'同担拒否ダイス',      rarity:'hero',   icon:'💢', faces:[1,2,3,4,5,6], kind:'special',
                  desc:'出目を記録。次の自分のターン開始までに同じ出目を出した相手に6ダメージ（1ターン継続）', flavor:'貴方が7推しだったら良かったのに' },
   echo:        { name:'やまびこダイス',      rarity:'hero',   icon:'🏔️', faces:[1,2,3,4,5,6], kind:'special',
-                 desc:'次の自分のターンのダイス効果（バフ・デバフのみ）を2回発動する（次のターン終了まで継続）', flavor:'やまびこをやまびこするのはデバッガーの仕事' },
+                 desc:'次の自分のターンのダイス効果を2回発動する（次のターン終了まで継続）', flavor:'やまびこをやまびこするのはデバッガーの仕事' },
   gamble_heal: { name:'ギャンブルヒールダイス', rarity:'hero', icon:'🎰', faces:[1,2,3,4,5,6], kind:'heal',
                  desc:'ダイスを3個振り、合計値にHPを変更する。上限10を突破できる', flavor:'ピンゾロを出したら勝ちでいいよ' },
   inv_heal:    { name:'無敵ヒールダイス',    rarity:'hero',   icon:'✨', faces:[1,1,1,1,4,4], kind:'special',
@@ -811,7 +811,7 @@ for (const id of ['heal','small_heal','big_heal','two_face_heal','odd_heal','eve
   EH[id]=async(die,roll,ctx,isEcho=false)=>{await applyHeal(ctx.userId,roll);};
 }
 EH['spike']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId,1,true);
+  if(!isEcho) await applyDamage(ctx.targetId,1,true);
   if(die.thorn && !ctx._thornDone){
     const thornStack = die.thorn === true ? 1 : die.thorn;
     if(!isEcho) await showSubtitle('📌 トゲスパイク貫通！', 'penetrate'); 
@@ -835,7 +835,7 @@ EH['bow']=async(die,roll,ctx,isEcho=false)=>{
   ctx.turnState.bowUsed=true;
 };
 EH['arrow']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   if(ctx.turnState.bowUsed){
     if(!isEcho) await showSubtitle('🏹 弓コンボ: 追加5貫通ダメージ！', 'penetrate');
     pushPopup('🏹 矢: 弓とのコンボで追加5貫通ダメージ！','penetrate');
@@ -844,21 +844,23 @@ EH['arrow']=async(die,roll,ctx,isEcho=false)=>{
   }
 };
 EH['thorn']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId,roll);
+  if(!isEcho) await applyDamage(ctx.targetId,roll);
   if(!isEcho) await showSubtitle('🌵 トゲ: 追加3ダメ＆自1貫通ダメ！', 'effect');
   pushPopup('🌵 トゲ: +3ダメ！自-1貫通ダメ','effect');
   await applyDamage(ctx.targetId,3,false);await applyDamage(ctx.userId,1,true);
   // (generic thorn also applies after this because thorn stack adds on top of normal thorn die effect)
 };
 EH['double_die']=async(die,roll,ctx,isEcho=false)=>{
-  // Wダイス: 出目分のダメージ + 自分を同じ出目分回復
-  await applyDamage(ctx.targetId, roll);
-  await applyHeal(ctx.userId, roll);
+  // Wダイス: 次のプレイヤーにダメージ + 自身のHP回復
+  if(!isEcho) {
+    await applyDamage(ctx.targetId, roll);
+    await applyHeal(ctx.userId, roll);
+  }
   if(!isEcho) await showSubtitle(`☣️ Wダイス: ${roll}ダメージ & ${roll}回復！`, 'heal');
   pushPopup(`☣️ Wダイス: ${roll}ダメージ+${roll}回復!`,'heal');
 };
-EH['unstable']=async(die,roll,ctx,isEcho=false)=>{await applyDamage(ctx.targetId,roll);};
-EH['barrel']=async(die,roll,ctx,isEcho=false)=>{await applyDamage(ctx.targetId,roll);};
+EH['unstable']=async(die,roll,ctx,isEcho=false)=>{if(!isEcho) await applyDamage(ctx.targetId,roll);};
+EH['barrel']=async(die,roll,ctx,isEcho=false)=>{if(!isEcho) await applyDamage(ctx.targetId,roll);};
 EH['iron']=async(die,roll,ctx,isEcho=false)=>{
   const players=await getPlayers();let maxHp=-1,targets=[];
   for(const [pid,p] of Object.entries(players)){if(pid===ctx.userId||p.eliminated)continue;if(p.hp>maxHp){maxHp=p.hp;targets=[pid];}else if(p.hp===maxHp)targets.push(pid);}
@@ -866,10 +868,10 @@ EH['iron']=async(die,roll,ctx,isEcho=false)=>{
   const ironTgt=pickRandom(targets);
   if(!isEcho) await showSubtitle(`⚙️ 鉄: 最高HP ${players[ironTgt]?.name} を攻撃！`, 'effect');
   pushPopup(`⚙️ 鉄: 最高HP「${players[ironTgt]?.name}」(${maxHp}HP)を攻撃！`,'effect');
-  const old=ctx.targetId;ctx.targetId=ironTgt;await applyDamage(ironTgt,roll);ctx.targetId=old;
+  const old=ctx.targetId;ctx.targetId=ironTgt;if(!isEcho) await applyDamage(ironTgt,roll);ctx.targetId=old;
 };
 EH['treasure']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   await showSubtitle('💎 トレジャー: 追加ドラフト！', 'effect');
   pushPopup('💎 トレジャーダイス: 追加ドラフト獲得！','effect');await addLog('💎 トレジャー: 追加ドラフト','effect');
   if(!isEcho) {
@@ -878,7 +880,7 @@ EH['treasure']=async(die,roll,ctx,isEcho=false)=>{
     await setPlayerField(ctx.userId, {'status/extraDrafts': currentExtra + 1});
   }
 };
-EH['double_heal']=async(die,roll,ctx,isEcho=false)=>{await applyHeal(ctx.userId,roll);if(ctx.targetId)await applyHeal(ctx.targetId,roll);};
+EH['double_heal']=async(die,roll,ctx,isEcho=false)=>{if(!isEcho){await applyHeal(ctx.userId,roll);if(ctx.targetId)await applyHeal(ctx.targetId,roll);}};
 EH['poison_heal']=async(die,roll,ctx,isEcho=false)=>{
   if(!isEcho) await applyHeal(ctx.userId,roll);
   const me = localPlayers[ctx.userId];
@@ -888,7 +890,7 @@ EH['poison_heal']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup('☠️ 毒カウンターセット！','effect');await addLog('☠️ 毒カウンターセット','effect');
 };
 EH['ex_heal']=async(die,roll,ctx,isEcho=false)=>{
-  await applyHeal(ctx.userId,roll);
+  if(!isEcho) await applyHeal(ctx.userId,roll);
   if(!isEcho) {
     ctx.turnState.exHealBonus=true;
     await showSubtitle('💊 ヒールダイス追加！', 'effect');
@@ -903,7 +905,7 @@ EH['barrier_heal']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup(`🛡️ バリアヒール: バリア+3 (→${nb})`,'barrier');await addLog(`🛡️ バリア+3→${nb}`,'barrier');
 };
 EH['compress']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   const tgtId=await pickTarget('圧縮の対象を選んでください',true);if(!tgtId)return;
   const hand=await getHand(tgtId);
   const newHand=hand.map(d=>{
@@ -915,7 +917,7 @@ EH['compress']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup(`🗜️ 圧縮: ${localPlayers[tgtId]?.name||tgtId} の4以上を1〜3に変換！`,'effect');await addLog(`🗜️ 圧縮→${localPlayers[tgtId]?.name}`,'effect');
 };
 EH['thornify']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   await showSubtitle('🌿 全ダイスにトゲ効果付与！', 'effect');
   const hand=await getHand(ctx.userId);
   const newHand=hand.map(d=>{
@@ -926,13 +928,13 @@ EH['thornify']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup('🌿 トゲ付け: 全ダイスにトゲ効果付与！','effect');await addLog('🌿 トゲ付け全体','effect');
 };
 EH['bomb']=async(die,roll,ctx,isEcho=false)=>{
-  if(!isEcho) await showSubtitle('💣 爆弾！全員に3ダメージ！', 'damage');
+  if(!isEcho) await showSubtitle('💣 爆弾: 全員に3ダメージ！', 'damage');
   pushPopup('💣 爆発！全プレイヤーに3の通常ダメージ！','effect');await addLog('💣 爆弾: 全員3ダメ','effect');
   const players=await getPlayers();
   for(const [pid,p] of Object.entries(players)){if(!p.eliminated){await applyDamage(pid,3,false);await delay(300);}}
 };
 EH['rival']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   const me = localPlayers[ctx.userId];
   const currentRolls = me?.status?.rivalRolls || {};
   const currentStack = currentRolls[roll] || 0;
@@ -941,7 +943,7 @@ EH['rival']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup(`💢 同担拒否: 出目 [${roll}] を記録！`,'effect');await addLog(`💢 同担拒否(${roll})セット`,'effect');
 };
 EH['echo']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   if(isEcho)return;
   const players=await getPlayers(); const me=players[ctx.userId];
   const curMult = me?.status?.echoMultiplierActive || 1;
@@ -971,8 +973,8 @@ EH['inv_heal']=async(die,roll,ctx,isEcho=false)=>{
   }
 };
 EH['dominance']=async(die,roll,ctx,isEcho=false)=>{
-  if(!isEcho) await showSubtitle(`👑 下克上！ ${roll}ダメージ！`, 'damage');
-  await applyDamage(ctx.targetId,roll);
+  if(!isEcho) await showSubtitle(`👑 ${roll}ダメージ！`, 'damage');
+  if(!isEcho) await applyDamage(ctx.targetId,roll);
   // 下克上状態をセット（初回のみ。executeDiceWithDominance内で再発動ループが動く）
   if(!isEcho) {
     await setPlayerField(ctx.userId,{'status/dominanceActive':true, 'status/dominanceTurns':2});
@@ -1024,7 +1026,7 @@ EH['accumulate']=async(die,roll,ctx,isEcho=false)=>{
   }
 };
 EH['break_die']=async(die,roll,ctx,isEcho=false)=>{
-  await applyDamage(ctx.targetId, roll);
+  if(!isEcho) await applyDamage(ctx.targetId, roll);
   const breakAmt=Math.min(roll,3);
   if(!isEcho) await showSubtitle(`💥 ブレイク！ 全員のバリア最大${breakAmt}破壊！`, 'effect');
   pushPopup(`💥 ブレイク [${roll}]: 全員バリアを最大${breakAmt}破壊してその分ダメージ！`,'effect');await addLog(`💥 ブレイク: 最大${breakAmt}`,'effect');
@@ -1087,9 +1089,7 @@ async function executeOneDie(die,ctx) {
     return roll;
   }
 
-  // バフ・デバフのみやまびこ倍率を適用する
-  const isBuffDebuff = ['echo', 'thornify', 'rival', 'poison_heal', 'ex_heal', 'dominance', 'inv_heal', 'treasure', 'accumulate', 'compress', 'barrier_heal', 'bomb'].includes(die.cid);
-  const echoMult = (isBuffDebuff && !ctx.echoMode && me?.status?.echoMultiplierActive) ? (me.status.echoMultiplierActive) : 1;
+  const echoMult = (handler && !ctx.echoMode && me?.status?.echoMultiplierActive) ? (me.status.echoMultiplierActive) : 1;
   
   // 蓄積のダイスで1が出た時はやまびこ無効（放出）
   const actualLoops = (die.cid === 'accumulate' && roll === 1) ? 1 : echoMult;
@@ -1101,7 +1101,18 @@ async function executeOneDie(die,ctx) {
       await showSubtitle(`🏔️ やまびこ: 発動 ${i+1}/${actualLoops}回目！`, 'effect');
       pushPopup(`🏔️ やまびこ: ${i+1}/${actualLoops}回目`,'effect');
     }
-    if(handler) await handler(die,roll,{...ctx, echoMode: isEchoLoop}, isEchoLoop);
+    
+    if(handler) {
+      await handler(die,roll,{...ctx, echoMode: isEchoLoop}, isEchoLoop);
+    } else {
+      if(DC[die.cid]?.kind==='heal'){
+        await applyHeal(ctx.userId,roll);
+        if(!isEchoLoop) await showSubtitle(`💚 ${roll}回復！`, 'heal');
+      } else {
+        await applyDamage(ctx.targetId,roll);
+        if(!isEchoLoop) await showSubtitle(`⚔️ ${roll}ダメージ！`, 'damage');
+      }
+    }
   }
   
   await applyThornExtra(die,roll,ctx,false);
@@ -1223,7 +1234,8 @@ async function useSelectedDice() {
   }
   selectedIds=[];renderHand(false);
   
-  const me = localPlayers[myPlayerId];
+  const curMeSnap3 = await R('players', myPlayerId).once('value');
+  const me = curMeSnap3.val();
   if ((me?.status?.extraDrafts || 0) > 0) {
     await delay(300);
     await setPlayerField(myPlayerId, {'status/extraDrafts': (me.status.extraDrafts - 1)});
@@ -1263,7 +1275,8 @@ async function doDraftPhase(extraRound=false) {
   myHand=await getHand(myPlayerId);myHand.push(...picks);await setHand(myPlayerId,myHand);
   if(loot.length>0)await R('gameState/loot/'+myPlayerId).set(null);
   for(const p of picks){pushPopup(`📦 ${localPlayers[myPlayerId]?.name||'?'} が「${DC[p.cid]?.name}」を獲得！`,'system');await addLog(`📦 ドラフト: ${DC[p.cid]?.name}`,'system');}
-  const me = localPlayers[myPlayerId];
+  const curMeSnap4 = await R('players', myPlayerId).once('value');
+  const me = curMeSnap4.val();
   if (extraRound) {
     if ((me?.status?.extraDrafts || 0) > 0) {
       await setPlayerField(myPlayerId, {'status/extraDrafts': (me.status.extraDrafts - 1)});

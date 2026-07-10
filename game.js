@@ -1082,7 +1082,7 @@ async function executeOneDie(die,ctx) {
   }
 
   // バフ・デバフのみやまびこ倍率を適用する
-  const isBuffDebuff = ['echo', 'thornify', 'rival', 'poison_heal', 'ex_heal', 'dominance', 'inv_heal', 'treasure', 'accumulate', 'compress', 'barrier_heal'].includes(die.cid);
+  const isBuffDebuff = ['echo', 'thornify', 'rival', 'poison_heal', 'ex_heal', 'dominance', 'inv_heal', 'treasure', 'accumulate', 'compress', 'barrier_heal', 'bomb'].includes(die.cid);
   const echoMult = (isBuffDebuff && !ctx.echoMode && me?.status?.echoMultiplierActive) ? (me.status.echoMultiplierActive) : 1;
   
   // 蓄積のダイスで1が出た時はやまびこ無効（放出）

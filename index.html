@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ダイスランブル — ダイス構築型バトルロイヤル</title>
+  <meta name="description" content="2〜7人対応オンライン対戦ダイスゲーム。合言葉で部屋を作って最後の1人になれ！">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Sound Toggle -->
+<button id="sound-toggle" class="sound-toggle">🔇 音OFF</button>
+
+<!-- Subtitle Overlay -->
+<div class="subtitle-overlay">
+  <div id="subtitle-text" class="subtitle-text"></div>
+</div>
+
+<!-- Dice Roll Overlay -->
+<div id="dice-roll-overlay" class="dice-roll-overlay">
+  <div class="dice-roll-container">
+    <div id="dice-roll-name" class="dice-roll-name">ダイス</div>
+    <div id="dice-roll-icon" class="dice-roll-icon">
+      <div id="dice-roll-result" class="dice-roll-result"></div>
+    </div>
+    <div class="dice-roll-tap-hint" id="dice-roll-hint">👆 タップして振る！</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: トップ -->
+<!-- ============================================================ -->
+<div id="screen-top" class="screen active">
+  <h1 class="game-title">DICE RUMBLE</h1>
+  <p class="game-subtitle">🎲 ダイス構築型バトルロイヤル 🎲</p>
+
+  <div class="top-form" style="margin-top:1.5rem;">
+    <label class="field-label">合言葉（部屋名）</label>
+    <input type="text" id="input-passphrase" class="input-field"
+           placeholder="例: 夏の大冒険 / my-room" maxlength="40" autocomplete="off">
+    <label class="field-label" style="margin-top:.7rem;">プレイヤー名</label>
+    <input type="text" id="input-name" class="input-field"
+           placeholder="最大12文字" maxlength="12" autocomplete="off">
+    <button id="btn-enter-room" class="btn btn-primary" style="margin-top:.9rem;">🚪 入室する</button>
+  </div>
+
+  <div class="top-hint">
+    <span>💡</span>
+    <div>
+      同じ合言葉を<strong>最初に入力した人がホスト</strong>になります<br>
+      同じ合言葉＋同じ名前で<strong>途中再接続</strong>できます
+    </div>
+  </div>
+  <p id="top-error" class="error-msg"></p>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: ロビー -->
+<!-- ============================================================ -->
+<div id="screen-lobby" class="screen">
+  <div style="text-align:center;">
+    <p class="screen-subtitle">合言葉</p>
+    <div id="room-passphrase-display" class="room-code-display" title="クリックでコピー">------</div>
+    <p class="screen-subtitle" style="margin-top:.35rem;font-size:.72rem;opacity:.7;">
+      この合言葉を友達に伝えて参加してもらおう
+    </p>
+  </div>
+
+  <div class="player-list" id="lobby-player-list"></div>
+  <p id="lobby-status" class="screen-subtitle" style="font-size:.75rem;"></p>
+
+  <div class="btn-group" style="width:290px;">
+    <button id="btn-start-game" class="btn btn-primary" disabled>ゲーム開始（2人以上）</button>
+    <button id="btn-leave-lobby" class="btn btn-danger">退出</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: マリガン -->
+<!-- ============================================================ -->
+<div id="screen-mulligan" class="screen">
+  <h2 class="screen-title">✦ マリガン</h2>
+  <p class="screen-subtitle">
+    入れ替えたいダイスを1枚選び「入れ替える」を押してください<br>
+    <span style="font-size:.75rem;opacity:.7;">右クリックでダイス詳細 / 「図鑑」でも確認可</span>
+  </p>
+
+  <div class="dice-hand" id="mulligan-hand"></div>
+
+  <div class="btn-group" style="width:280px;">
+    <button id="btn-mulligan-swap" class="btn btn-primary" disabled>入れ替える</button>
+    <button id="btn-mulligan-skip" class="btn">入れ替えない（このまま進む）</button>
+  </div>
+
+  <div id="mulligan-waiting" class="waiting-indicator" style="display:none;">
+    <div class="spinner" style="width:20px;height:20px;border-width:2px;"></div>
+    <span>他のプレイヤーを待っています</span>
+    <span class="waiting-dots"><span>.</span><span>.</span><span>.</span></span>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: ゲームメイン -->
+<!-- ============================================================ -->
+<div id="screen-game" class="screen">
+
+  <!-- ヘッダー -->
+  <div class="game-header">
+    <div class="round-info">
+      <span id="round-display">Round 1</span>
+      <span class="phase-badge" id="phase-display">開始</span>
+    </div>
+    <div id="turn-indicator" class="turn-indicator">準備中...</div>
+    <div class="sd-badge" id="sd-badge">⚡ SUDDEN DEATH</div>
+  </div>
+
+  <!-- 対戦相手エリア -->
+  <div class="opponents-area" id="opponents-area"></div>
+
+  <!-- アクションログ -->
+  <div class="log-toggle-container">
+    <button id="btn-toggle-log" class="btn-toggle-log">📜 ログを開く</button>
+  </div>
+  <div class="action-log-area collapsed" id="action-log-area">
+    <div class="log-popup type-system">🎲 ゲーム開始！ダイスランブルへようこそ！</div>
+  </div>
+
+  <!-- 自分エリア -->
+  <div class="self-area">
+    <div class="self-stats">
+      <div class="self-hp-wrap">
+        <div class="stat-label">HP</div>
+        <div class="self-hp-bar-wrap">
+          <div class="self-hp-bar" id="self-hp-bar" style="width:100%;background:var(--hp-high);"></div>
+        </div>
+        <div class="stat-val" id="self-hp-val">10 HP</div>
+      </div>
+      <div class="stat-block" style="text-align:center;min-width:76px;">
+        <div class="stat-label">バリア</div>
+        <div class="stat-val" id="self-barrier-val" style="color:var(--barrier-col);">🛡 0</div>
+      </div>
+      <div class="stat-block" style="text-align:center;min-width:50px;">
+        <div class="stat-label">手札</div>
+        <div class="stat-val" id="self-hand-count">4</div>
+      </div>
+    </div>
+
+    <div class="self-hand" id="self-hand"></div>
+
+    <div class="action-btns" id="action-btns">
+        <button id="btn-use-dice" class="btn btn-primary" disabled>決定</button>
+    </div>
+
+    <div id="waiting-turn" class="waiting-indicator" style="justify-content:center;">
+      <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
+      <span id="waiting-turn-text">他のプレイヤーのターンです</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: ドラフト -->
+<!-- ============================================================ -->
+<div id="screen-draft" class="screen">
+  <h2 class="screen-title">📦 ドラフト</h2>
+  <p class="screen-subtitle" id="draft-subtitle">2枚のダイスを選んでください</p>
+  <div class="draft-counter" id="draft-counter">0 / 2 選択中</div>
+  <div class="draft-pool" id="draft-pool"></div>
+  <div class="btn-group" style="width:280px;margin-top:.5rem;">
+    <button id="btn-draft-confirm" class="btn btn-primary" disabled>✅ 確定する</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN: ゲーム終了 -->
+<!-- ============================================================ -->
+<div id="screen-end" class="screen">
+  <div style="text-align:center;">
+    <div class="winner-title" id="end-title">🏆 勝者</div>
+    <div class="winner-names" id="winner-names">---</div>
+    <p class="screen-subtitle" id="end-subtitle" style="margin-bottom:1.5rem;"></p>
+  </div>
+  <div class="btn-group" style="width:280px;">
+    <button id="btn-rematch"    class="btn btn-primary">🔄 再戦する（同じメンバーで）</button>
+    <button id="btn-back-lobby" class="btn btn-success">🏠 ロビーに戻る</button>
+    <button id="btn-show-endlog" class="btn">📋 ゲームログを見る</button>
+    <button id="btn-back-top"   class="btn btn-danger" style="margin-top:.3rem;font-size:.82rem;">✕ タイトルへ戻る</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- FAB GROUP (ゲーム中・ドラフト中に表示) -->
+<!-- ============================================================ -->
+<div class="fab-group" id="fab-group">
+  <button class="fab fab-catalog" id="fab-catalog" title="ダイス図鑑 📚">📚</button>
+  <button class="fab fab-rules"   id="fab-rules"   title="ルール 📖">📖</button>
+  <button class="fab fab-log"     id="fab-log"     title="ゲームログ 📋">📋</button>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODALS -->
+<!-- ============================================================ -->
+
+<!-- Modal: プレイヤーステータス -->
+<div class="modal-overlay" id="modal-player-status">
+  <div class="modal-box">
+    <button class="modal-close" id="close-player-status">✕</button>
+    <div class="modal-title" id="modal-player-name">プレイヤー名</div>
+    <div class="status-rows" id="modal-status-rows"></div>
+  </div>
+</div>
+
+<!-- Modal: ダイス詳細 -->
+<div class="modal-overlay" id="modal-dice-detail">
+  <div class="modal-box">
+    <button class="modal-close" id="close-dice-detail">✕</button>
+    <div class="ddetail-head">
+      <div class="ddetail-icon" id="ddetail-icon">🎲</div>
+      <div>
+        <div class="ddetail-title" id="ddetail-name">---</div>
+        <div class="ddetail-rarity" id="ddetail-rarity">---</div>
+      </div>
+    </div>
+    <div class="ddetail-faces" id="ddetail-faces"></div>
+    <div class="ddetail-effect" id="ddetail-effect"></div>
+    <div class="ddetail-flavor" id="ddetail-flavor"></div>
+  </div>
+</div>
+
+<!-- Modal: ターゲット選択 -->
+<div class="modal-overlay" id="modal-target">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-target-title">対象を選んでください</div>
+    <div class="target-list" id="target-list"></div>
+  </div>
+</div>
+
+<!-- Modal: ゲームログ -->
+<div class="modal-overlay" id="modal-log">
+  <div class="modal-box" style="width:450px;">
+    <button class="modal-close" id="close-log">✕</button>
+    <div class="modal-title">📋 ゲームログ</div>
+    <div class="log-full-list" id="log-full-list"></div>
+  </div>
+</div>
+
+<!-- Modal: ディスカード -->
+<div class="modal-overlay" id="modal-discard">
+  <div class="modal-box">
+    <div class="modal-title">手札調整</div>
+    <p class="screen-subtitle" id="discard-subtitle" style="margin-bottom:.8rem;">
+      4枚になるようにダイスを選んで捨ててください
+    </p>
+    <div class="dice-hand" id="discard-hand" style="margin-bottom:1rem;"></div>
+    <div class="btn-group" style="width:100%;">
+      <button id="btn-discard-confirm" class="btn btn-danger" disabled>選択したダイスを捨てる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: サドンデス通知 -->
+<div class="modal-overlay" id="modal-sudden">
+  <div class="modal-box" style="text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">💀</div>
+    <div class="modal-title" style="font-family:var(--font-num);color:#ff4444;font-size:1.4rem;">SUDDEN DEATH</div>
+    <p class="screen-subtitle" style="margin-top:.75rem;line-height:1.65;">
+      サドンデスモード突入！<br>
+      各プレイヤーはターン終了時に<br>
+      <strong style="color:#ff8800;">バリアと同値の貫通ダメージ</strong>を受け続ける。
+    </p>
+    <button id="btn-close-sudden" class="btn btn-danger" style="margin-top:1rem;width:100%;">了解</button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal: ルール -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-rules">
+  <div class="modal-box rules-modal-box">
+    <button class="modal-close" id="close-rules">✕</button>
+    <div class="modal-title">📖 ルール</div>
+    <div class="rules-content">
+
+      <div class="rules-section">
+        <h3>🎯 勝利条件</h3>
+        <p>HPが0にならず<strong class="rules-highlight">最後まで生き残った1人</strong>が勝者。<br>
+        同時に全員HPが0になった場合は全員勝利（引き分け）。</p>
+      </div>
+
+      <div class="rules-section">
+        <h3>📊 ステータス</h3>
+        <ul>
+          <li><strong>HP</strong>：初期値&上限 <strong class="rules-highlight">10</strong>（ギャンブルヒールのみ上限突破可）</li>
+          <li><strong>バリア</strong>：ターン開始時に2d6で設定。通常ダメージをHPより先に受ける</li>
+          <li><strong>手札</strong>：常に最大4枚。他のプレイヤーには非公開</li>
+        </ul>
+      </div>
+
+      <div class="rules-section">
+        <h3>🔄 ターンの流れ</h3>
+        <ol>
+          <li><strong>開始フェーズ</strong>：バリアリセット → 2d6でバリア設定 → 状態更新</li>
+          <li><strong>アクションフェーズ</strong>：手札から最大2個を選んで使用（順番指定あり）</li>
+          <li><strong>ドラフトフェーズ</strong>：4枚から2枚を選んで手札に加える</li>
+          <li><strong>終了フェーズ</strong>：手札が5枚以上あれば4枚に調整（選んで捨てる）</li>
+        </ol>
+      </div>
+
+      <div class="rules-section">
+        <h3>💥 ダメージ種別</h3>
+        <ul>
+          <li><span class="t-dmg">■ 通常ダメージ</span>：バリア→HPの順に減少。無敵状態で無効化可</li>
+          <li><span class="t-pen">■ 貫通ダメージ</span>：バリアを無視してHPに直接。無敵でも防げない</li>
+        </ul>
+      </div>
+
+      <div class="rules-section">
+        <h3>🎯 攻撃対象のデフォルト</h3>
+        <p>効果に「対象選択」がない限り、攻撃は<strong class="rules-highlight">座順で次のプレイヤー（画面上の相手エリア左端）</strong>に向かう。</p>
+      </div>
+
+      <div class="rules-section">
+        <h3>💀 脱落と遺品</h3>
+        <ul>
+          <li>HPが0以下になったプレイヤーは即座に脱落</li>
+          <li>脱落時の手札が<strong class="rules-highlight">遺品</strong>としてドロップされる</li>
+          <li>キルしたプレイヤーは次のドラフトで遺品を優先的に獲得できる</li>
+        </ul>
+      </div>
+
+      <div class="rules-section">
+        <h3>⚡ サドンデスモード</h3>
+        <p><strong style="color:#ff4444;">参加人数×4ラウンド</strong>を超えると突入。<br>
+        以降、ターン終了時に<span class="t-pen">自分のバリア値分の貫通ダメージ</span>を受け続ける。</p>
+      </div>
+
+      <div class="rules-section">
+        <h3>✨ 状態異常一覧</h3>
+        <ul>
+          <li><strong>✨ 無敵</strong>：通常ダメージを無効化（貫通ダメージは防げない）</li>
+          <li><strong>☠️ 毒カウンター</strong>：次に自分を攻撃した相手に3ダメージ反射</li>
+          <li><strong>🏔️ やまびこ</strong>：次ターンのダイス効果（バフ・デバフ）が2回発動。ダメージ・回復は1回</li>
+          <li><strong>👑 下克上</strong>：ダイスを振るたびに1〜3が出る間再発動（最大4回追加）</li>
+          <li><strong>💢 同担拒否</strong>：記録した出目を出した相手に即6ダメージ</li>
+          <li><strong>📦 蓄積スタック</strong>：蓄積のダイスが保持する値。1が出た時に一括放出</li>
+          <li><strong>🛢️ 樽熟成</strong>：ターン開始時に全出目+1（永続・累積）</li>
+        </ul>
+      </div>
+
+      <div class="rules-section">
+        <h3>🏹 弓と矢の連携</h3>
+        <p>同じターンのアクションで<strong>弓のダイス</strong>を先に使った後に<strong>矢のダイス</strong>を使うと、<span class="t-pen">5の貫通ダメージ</span>が発動。矢単体では不発。</p>
+      </div>
+
+      <div class="rules-section">
+        <h3>📌 トゲ付き効果</h3>
+        <p>トゲ付きダイス・トゲ付けダイスで付与。<br>
+        使用時に追加3ダメージ、自分に1ダメージ。尖りダイスのトゲは全て貫通扱い。</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal: ダイス図鑑 -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-catalog">
+  <div class="modal-box catalog-modal-box">
+    <button class="modal-close" id="close-catalog">✕</button>
+    <div class="modal-title">🎲 ダイス図鑑</div>
+    <div class="catalog-filter">
+      <button class="catalog-filter-btn active" data-rarity="all">すべて</button>
+      <button class="catalog-filter-btn" data-rarity="normal">🟢 ノーマル</button>
+      <button class="catalog-filter-btn" data-rarity="rare">🔵 レア</button>
+      <button class="catalog-filter-btn" data-rarity="hero">🟣 英雄</button>
+      <button class="catalog-filter-btn" data-rarity="legend">🟡 伝説</button>
+    </div>
+    <div id="catalog-content"></div>
+  </div>
+</div>
+
+<!-- Firebase compat SDK (file://でも動く通常script形式) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

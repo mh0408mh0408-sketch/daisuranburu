@@ -101,7 +101,7 @@ const DC = {
                  desc:'2〜6: 出目分スタックを積み手持ちに戻る。1: スタック分のダメージを放出する', flavor:'いきなり「1」は出すなよ！！絶対に出すなよ！！' },
   break_die:   { name:'ブレイクダイス',      rarity:'legend', icon:'💥', faces:[1,2,3,4,5,6], kind:'special',
                  desc:'自分以外の全プレイヤーのバリアを最大3まで破壊し、破壊した分のダメージを与える', flavor:'◾︎T・ブレイカー' },
-  sudden_death:{ name:'サドンデスダイス',    rarity:'special', icon:'🔥', faces:[1,2,3,4,5,6], kind:'special',
+  sudden_death:{ name:'サドンデスダイス',    rarity:'special', icon:'🔥', faces:[1,2,3,1,2,3], kind:'special',
                  desc:'ターン終了時に出目分の貫通ダメージを受ける', flavor:'死のカウントダウン' }
 };
 
@@ -217,7 +217,7 @@ function getPlayerColor(pid) {
 
 function defaultStatus() {
   return { invincibleTurns:0, poisonCounter:false, echoActive:false,
-           dominanceActive:false, rivalRoll:null };
+           dominanceActive:false, rivalRolls:null };
 }
 
 // ================================================================
@@ -591,7 +591,13 @@ function statusIcons(st) {
   if (st.poisonCounter)           list.push({i:'☠️',t:'毒カウンター'});
   if (st.echoActive)              list.push({i:'🏔️',t:'やまびこ'});
   if (st.dominanceActive)         list.push({i:'👑',t:'下克上状態'});
-  if (st.rivalRoll!=null)         list.push({i:'💢',t:`同担拒否(${st.rivalRoll})`});
+  if (st.rivalRolls) {
+    for (const [r, c] of Object.entries(st.rivalRolls)) {
+      if (c > 0) list.push({i:'💢',t:`同担(${r})x${c}`});
+    }
+  } else if (st.rivalRoll!=null) {
+    list.push({i:'💢',t:`同担(${st.rivalRoll})`});
+  }
   return list;
 }
 
@@ -610,7 +616,13 @@ function showPlayerStatus(pid) {
   if (st.poisonCounter)           addRow('☠️','毒カウンター','次の攻撃者に3ダメージ反射');
   if (st.echoActive)              addRow('🏔️','やまびこ','次ターン効果2回');
   if (st.dominanceActive)         addRow('👑','下克上','1〜3連鎖発動中');
-  if (st.rivalRoll!=null)         addRow('💢',`同担拒否(${st.rivalRoll})`,`出目${st.rivalRoll}→6ダメ`);
+  if (st.rivalRolls) {
+    for (const [r, c] of Object.entries(st.rivalRolls)) {
+      if (c > 0) addRow('💢',`同担拒否(${r})x${c}`,`出目${r}で${c*6}ダメージ`);
+    }
+  } else if (st.rivalRoll!=null) {
+    addRow('💢',`同担拒否(${st.rivalRoll})`,`出目${st.rivalRoll}で6ダメージ`);
+  }
   if (rows.children.length===1)
     rows.innerHTML+='<div style="color:#4d3d66;font-size:.82rem;padding:.8rem;text-align:center">状態異常なし</div>';
   openModal('modal-player-status');
@@ -769,8 +781,9 @@ async function checkRivalWatch(roll) {
   const players=await getPlayers();
   for (const [pid,p] of Object.entries(players)) {
     if (pid===myPlayerId||p.eliminated) continue;
-    if ((p.status?.rivalRoll??null)!==null&&p.status.rivalRoll===roll) {
-      const stacks = p.status.rivalRollCount || 1;
+    const rolls = p.status?.rivalRolls || {};
+    if (rolls[roll] && rolls[roll] > 0) {
+      const stacks = rolls[roll];
       const dmg = 6 * stacks;
       const msg=`💢 同担拒否！ [${roll}] が ${p.name} のトリガー！ ${dmg} ダメージ！`;
       await showSubtitle(`💢 同担拒否 発動！ ${dmg} ダメージ！`, 'damage');
@@ -850,6 +863,7 @@ EH['iron']=async(die,roll,ctx,isEcho=false)=>{
   const old=ctx.targetId;ctx.targetId=ironTgt;await applyDamage(ironTgt,roll);ctx.targetId=old;
 };
 EH['treasure']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   await showSubtitle('💎 トレジャー: 追加ドラフト！', 'effect');
   pushPopup('💎 トレジャーダイス: 追加ドラフト獲得！','effect');await addLog('💎 トレジャー: 追加ドラフト','effect');
   if(!isEcho) {
@@ -883,6 +897,7 @@ EH['barrier_heal']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup(`🛡️ バリアヒール: バリア+3 (→${nb})`,'barrier');await addLog(`🛡️ バリア+3→${nb}`,'barrier');
 };
 EH['compress']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   const tgtId=await pickTarget('圧縮の対象を選んでください',true);if(!tgtId)return;
   const hand=await getHand(tgtId);
   const newHand=hand.map(d=>{
@@ -894,6 +909,7 @@ EH['compress']=async(die,roll,ctx,isEcho=false)=>{
   pushPopup(`🗜️ 圧縮: ${localPlayers[tgtId]?.name||tgtId} の4以上を1〜3に変換！`,'effect');await addLog(`🗜️ 圧縮→${localPlayers[tgtId]?.name}`,'effect');
 };
 EH['thornify']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   await showSubtitle('🌿 全ダイスにトゲ効果付与！', 'effect');
   const hand=await getHand(ctx.userId);
   const newHand=hand.map(d=>{
@@ -910,13 +926,16 @@ EH['bomb']=async(die,roll,ctx,isEcho=false)=>{
   for(const [pid,p] of Object.entries(players)){if(!p.eliminated){await applyDamage(pid,3,false);await delay(300);}}
 };
 EH['rival']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   const me = localPlayers[ctx.userId];
-  const curCount = me?.status?.rivalRollCount || 0;
-  await setPlayerField(ctx.userId,{'status/rivalRoll':roll, 'status/rivalRollCount':curCount + 1});
+  const currentRolls = me?.status?.rivalRolls || {};
+  const currentStack = currentRolls[roll] || 0;
+  await setPlayerField(ctx.userId,{[`status/rivalRolls/${roll}`]: currentStack + 1});
   await showSubtitle(`💢 同担拒否！ 出目 [${roll}] を記録！`, 'effect');
   pushPopup(`💢 同担拒否: 出目 [${roll}] を記録！`,'effect');await addLog(`💢 同担拒否(${roll})セット`,'effect');
 };
 EH['echo']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   if(isEcho)return;
   const players=await getPlayers(); const me=players[ctx.userId];
   const curMult = me?.status?.echoMultiplierActive || 1;
@@ -986,6 +1005,7 @@ EH['accumulate']=async(die,roll,ctx,isEcho=false)=>{
     // useSelectedDice内で先にこのダイスを手札から削除済みなので、ここでは手札に戻さないでそのまま
   } else {
     // 2~6が出たら: スタックを積んで手札に戻る
+    await applyDamage(ctx.targetId, roll);
     const newStack = currentStack + roll;
     if(!isEcho) await showSubtitle(`📦 スタック+${roll} (計${newStack}) 手札へ！`, 'effect');
     pushPopup(`📦 蓄積: [${roll}] スタック→${newStack}！手持ちに戻る`,'effect');
@@ -999,6 +1019,7 @@ EH['accumulate']=async(die,roll,ctx,isEcho=false)=>{
   }
 };
 EH['break_die']=async(die,roll,ctx,isEcho=false)=>{
+  await applyDamage(ctx.targetId, roll);
   const breakAmt=Math.min(roll,3);
   if(!isEcho) await showSubtitle(`💥 ブレイク！ 全員のバリア最大${breakAmt}破壊！`, 'effect');
   pushPopup(`💥 ブレイク [${roll}]: 全員バリアを最大${breakAmt}破壊してその分ダメージ！`,'effect');await addLog(`💥 ブレイク: 最大${breakAmt}`,'effect');
@@ -1053,6 +1074,13 @@ async function executeOneDie(die,ctx) {
   const handler=EH[die.cid];
   const me = localPlayers[myPlayerId];
   
+  if (me?.status?.dominanceActive && roll >= 4) {
+    await showSubtitle(`👑 [${roll}] 4以上→失敗！`, 'system');
+    pushPopup(`👑 下克上中: [${roll}] 4以上のためダイス失敗`,'system');
+    await addLog(`👑 下克上失敗: ${roll}`,'system');
+    return roll;
+  }
+
   // バフ・デバフのみやまびこ倍率を適用する
   const isBuffDebuff = ['echo', 'thornify', 'rival', 'poison_heal', 'ex_heal', 'dominance', 'inv_heal', 'treasure', 'accumulate', 'compress', 'barrier_heal'].includes(die.cid);
   const echoMult = (isBuffDebuff && !ctx.echoMode && me?.status?.echoMultiplierActive) ? (me.status.echoMultiplierActive) : 1;
@@ -1102,7 +1130,7 @@ async function doStartPhase() {
   await setPlayerField(myPlayerId,{
     barrier: newBarrier,
     'status/invincibleTurns':invT,
-    'status/rivalRoll':null,
+    'status/rivalRolls':null,
     'status/echoActive':false,
     'status/echoMultiplierActive': 1
   });
@@ -1340,8 +1368,8 @@ async function advanceTurn() {
   while(players[turnOrder[nextIdx]]?.eliminated);
   const newRound=nextIdx<=currentPlayerIndex?round+1:round;
   const totalPlayers=Object.keys(players).length;
-  const sdThreshold=totalPlayers*4;const suddenDeath=gs.suddenDeath||newRound>sdThreshold;
-  if(!gs.suddenDeath&&suddenDeath){pushPopup(`⚡ サドンデスモード突入！（${sdThreshold}ラウンド経過）`,'death');await addLog('⚡ サドンデス突入！','death');openModal('modal-sudden');}
+  const sdThreshold=9;const suddenDeath=gs.suddenDeath||newRound>sdThreshold;
+  if(!gs.suddenDeath&&suddenDeath){pushPopup(`⚡ サドンデスモード突入！（Round 10）`,'death');await addLog('⚡ サドンデス突入！','death');openModal('modal-sudden');}
   await fbUpdate({currentPlayerIndex:nextIdx,round:newRound,suddenDeath,phase:'start',draftPool:null},'gameState');
 }
 

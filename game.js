@@ -93,8 +93,8 @@ const DC = {
                  desc:'次の自分のターンのダイス効果（バフ・デバフのみ）を2回発動する', flavor:'やまびこをやまびこするのはデバッガーの仕事' },
   gamble_heal: { name:'ギャンブルヒールダイス', rarity:'hero', icon:'🎰', faces:[1,2,3,4,5,6], kind:'heal',
                  desc:'ダイスを3個振り、合計値にHPを変更する。上限10を突破できる', flavor:'ピンゾロを出したら勝ちでいいよ' },
-  inv_heal:    { name:'無敵ヒールダイス',    rarity:'hero',   icon:'✨', faces:[1,1,1,4,4,4], kind:'special',
-                 desc:'4が出たら2ターン間無敵状態（通常ダメージ無効）になる。1は効果なし', flavor:'無敵だが、敵に直接触れて倒すことはできない' },
+  inv_heal:    { name:'無敵ヒールダイス',    rarity:'hero',   icon:'✨', faces:[1,1,1,1,4,4], kind:'special',
+                 desc:'4が出たら1ターン間無敵状態（通常ダメージ無効）になる。1は効果なし', flavor:'無敵だが、敵に直接触れて倒すことはできない' },
   dominance:   { name:'下克上ダイス',        rarity:'legend', icon:'👑', faces:[1,2,3,1,2,3], kind:'attack',
                  desc:'1〜3のダメージ後、下克上状態に。以降ダイスを振るたびに1〜3で再発動（最大4回追加、4以上で終了）', flavor:'' },
   accumulate:  { name:'蓄積のダイス',        rarity:'legend', icon:'📦', faces:[1,2,3,4,5,6], kind:'special',
@@ -466,15 +466,19 @@ async function showDiceRollAnim(die, roll, skipBroadcast=false) {
   iconEl.innerHTML = '';
   iconEl.appendChild(iconInner);
   iconEl.appendChild(resultEl);
-  if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '👆 タップして振る！'; }
-
   overlay.classList.add('show');
-
-  // Wait for tap
-  await new Promise(resolve => {
-    const handler = () => { overlay.removeEventListener('click', handler); resolve(); };
-    overlay.addEventListener('click', handler);
-  });
+  
+  if (!skipBroadcast) {
+    if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '👆 タップして振る！'; }
+    // Wait for tap
+    await new Promise(resolve => {
+      const handler = () => { overlay.removeEventListener('click', handler); resolve(); };
+      overlay.addEventListener('click', handler);
+    });
+  } else {
+    if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '相手がダイスを振っています...'; }
+    await delay(1200);
+  }
 
   if (hintEl) hintEl.style.display = 'none';
   iconEl.classList.add('anim-shake');
@@ -932,9 +936,9 @@ EH['gamble_heal']=async(die,roll,ctx,isEcho=false)=>{
 };
 EH['inv_heal']=async(die,roll,ctx,isEcho=false)=>{
   if(roll===4){
-    await setPlayerField(ctx.userId,{'status/invincibleTurns':2});
-    await showSubtitle('✨ [4] 2ターン無敵！', 'effect');
-    pushPopup('✨ 無敵ヒール: [4]！2ターン無敵！','effect');await addLog('✨ 無敵2ターン','effect');animPlayer(ctx.userId,'heal');
+    await setPlayerField(ctx.userId,{'status/invincibleTurns':1});
+    await showSubtitle('✨ [4] 1ターン無敵！', 'effect');
+    pushPopup('✨ 無敵ヒール: [4]！1ターン無敵！','effect');await addLog('✨ 無敵1ターン','effect');animPlayer(ctx.userId,'heal');
   }
   else{
     await showSubtitle('✨ [1] 効果なし', 'system');
@@ -1088,25 +1092,11 @@ async function doStartPhase() {
   }
 
   setMyTurnUI(true);
-  const btnUse = document.getElementById('btn-use-dice');
-  const btnRoll = document.getElementById('btn-roll-barrier');
-  if(btnUse) btnUse.style.display = 'none';
-  if(btnRoll) btnRoll.style.display = 'block';
 
-  await new Promise(resolve => {
-    if(!btnRoll) { resolve(); return; }
-    btnRoll.onclick = () => {
-      btnRoll.onclick = null;
-      btnRoll.style.display = 'none';
-      if(btnUse) btnUse.style.display = '';
-      resolve();
-    };
-  });
-
-  const bRecov = Math.floor(Math.random() * 3) + 1;
+  const bRecov = Math.floor(Math.random() * 6) + 1;
   const newBarrier = (me.barrier || 0) + bRecov;
 
-  const bdDie = {cid:'normal', name:'バリア回復(1d3)'};
+  const bdDie = {cid:'normal', name:'バリア回復(1d6)'};
   await showDiceRollAnim(bdDie, bRecov);
 
   await setPlayerField(myPlayerId,{
@@ -1133,48 +1123,13 @@ async function doActionPhase() {
     setMyTurnUI(true);selectedIds=[];
     turnState={bowUsed:false,extraDraft:false,exHealBonus:false};
     myHand=await getHand(myPlayerId);renderHand(true);
-    document.getElementById('btn-use-dice').disabled=myHand.length === 0;
+    const requiredCount = Math.min(2, myHand.length);
+    document.getElementById('btn-use-dice').disabled = selectedIds.length !== requiredCount;
   } catch(e) {
     pushPopup('ActionPhase Error: ' + e.message, 'damage');
   }
 }
 
-async function checkBarrierRequirement(attackerId, selectedIids) {
-  const {turnOrder,currentPlayerIndex}=localGameState;
-  let nextIdx = currentPlayerIndex;
-  let loopCount = 0;
-  do {
-    nextIdx = (nextIdx+1)%turnOrder.length;
-    loopCount++;
-    if(loopCount>turnOrder.length) return null;
-  } while (localPlayers[turnOrder[nextIdx]]?.eliminated);
-  
-  const defId = turnOrder[nextIdx];
-  let needsBarrier = false;
-  
-  const hand = await getHand(attackerId);
-  for(const iid of selectedIids) {
-    const die = hand.find(d=>d.iid===iid);
-    if(!die) continue;
-    if(die.cid === 'bomb') continue;
-    if(die.cid === 'iron') {
-       let maxHp=-1,targets=[];
-       for(const [pid,p] of Object.entries(localPlayers)){
-           if(pid===attackerId||p.eliminated)continue;
-           if(p.hp>maxHp){maxHp=p.hp;targets=[pid];}
-           else if(p.hp===maxHp)targets.push(pid);
-       }
-       if(targets.includes(defId)) needsBarrier = true;
-       continue;
-    }
-    if (['normal','small','big','two_face','odd','even','spike','bow','arrow','thorn','double_die','unstable','barrel','dominance','break_die','accumulate'].includes(die.cid)) {
-       needsBarrier = true;
-    }
-  }
-  
-  if (needsBarrier) return defId;
-  return null;
-}
 
 async function useSelectedDice() {
   setMyTurnUI(false);
@@ -1186,20 +1141,7 @@ async function useSelectedDice() {
   const iidsToExecute = [...selectedIds];
   selectedIds=[]; renderHand(false);
 
-  const defId = await checkBarrierRequirement(myPlayerId, iidsToExecute);
-  if (defId) {
-     await fbUpdate({phase:'barrier_reaction', barrierTarget: defId}, 'gameState');
-     await showSubtitle('🛡️ 相手のバリアロール待機中...', 'system');
-     await new Promise(resolve => {
-        const unsub = listen(R('gameState/phase'), snap => {
-           if(snap.val() === 'action_execute') {
-              unsub();
-              resolve();
-           }
-        });
-     });
-     document.getElementById('subtitle-text')?.classList.remove('show');
-  }
+
 
   const ctx={userId:myPlayerId,targetId:getDefaultTarget(),turnState:{bowUsed:false,extraDraft:false,exHealBonus:false},_thornDone:false,echoMode:false,_accumReturnedToHand:null};
   const inDominance=localPlayers[myPlayerId]?.status?.dominanceActive;
@@ -1503,15 +1445,7 @@ function setupRoomListeners() {
     }
     const {turnOrder,currentPlayerIndex,phase}=gs;if(!turnOrder)return;
     const currentPid=turnOrder[currentPlayerIndex];
-    if(phase==='barrier_reaction') {
-       if(gs.barrierTarget === myPlayerId) {
-          await doBarrierReactionPhase();
-       } else {
-          setMyTurnUI(false);
-          setWaitingText('バリアロール待機中...');
-       }
-       return;
-    }
+
     
     if(currentPid!==myPlayerId){setMyTurnUI(false);setWaitingText(localPlayers[currentPid]?.name||'?');return;}
     if(phase==='action_execute' && currentPid===myPlayerId) {
@@ -1526,21 +1460,6 @@ function setupRoomListeners() {
     if(phase==='end')   await doEndPhase();
   });
 
-async function doBarrierReactionPhase() {
-   setWaitingText('あなたのバリアロール');
-   await showSubtitle('🛡️ 敵の攻撃！タップしてバリア！', 'barrier');
-   pushPopup('🛡️ 敵の攻撃が来る！バリアダイスを振れ！', 'barrier');
-
-   const bdDie = {cid:'normal', name:'バリアダイス(2個)'};
-   const b1=rollD6(), b2=rollD6();
-   const barrierTotal = b1+b2;
-   await showDiceRollAnim(bdDie, `${b1}+${b2}`);
-
-   await setPlayerField(myPlayerId,{barrier:barrierTotal});
-   await addLog(`🛡️ バリア展開: ${barrierTotal}`, 'barrier');
-
-   await fbUpdate({phase:'action_execute'}, 'gameState');
-}
 
   // ─ ログ
   listen(R('log'), snap=>{

@@ -178,7 +178,14 @@ function mkDie(catalogId) {
 }
 
 function getEffectiveFaces(die) {
-  if (die.compressedFaces) return die.compressedFaces;
+  if (die.compressedFaces) {
+    let faces = [...die.compressedFaces];
+    if (die.cid === 'barrel' && die.barrelBonus > 0) {
+      const diff = die.barrelBonus - (die.compressedAtBarrelBonus || 0);
+      if (diff > 0) faces = faces.map(f => f + diff);
+    }
+    return faces;
+  }
   const faces = [...DC[die.cid].faces];
   if (die.cid === 'barrel' && die.barrelBonus > 0)
     return faces.map(f => f + die.barrelBonus);
@@ -263,6 +270,13 @@ function listen(r, cb) {
   return unsub;
 }
 
+function listenChildAdded(query, cb) {
+  query.on('child_added', cb);
+  const unsub = () => query.off('child_added', cb);
+  unsubList.push(unsub);
+  return unsub;
+}
+
 // ================================================================
 // UI HELPERS
 // ================================================================
@@ -279,11 +293,19 @@ function showError(msg) {
   if (el) { el.textContent=msg; setTimeout(()=>el.textContent='',5000); }
 }
 
+function broadcastEvent(ev) {
+  if (!myRoomId) return;
+  ev.ts = Date.now();
+  ev.actorId = myPlayerId;
+  R('events').push(ev);
+}
+
 function showFabGroup(show) {
   document.getElementById('fab-group')?.classList.toggle('show', show);
 }
 
-function pushPopup(msg, type='system') {
+function pushPopup(msg, type='system', skipBroadcast=false) {
+  if (!skipBroadcast) broadcastEvent({type: 'popup', msg, msgType: type});
   const area = document.getElementById('action-log-area'); if (!area) return;
   const div  = document.createElement('div');
   div.className = `log-popup type-${type}`;
@@ -293,7 +315,8 @@ function pushPopup(msg, type='system') {
   area.scrollTop = area.scrollHeight;
 }
 
-function floatNum(pid, amount, kind) {
+function floatNum(pid, amount, kind, skipBroadcast=false) {
+  if (!skipBroadcast) broadcastEvent({type: 'floatNum', pid, amount, kind});
   const el = document.querySelector(`[data-pid="${pid}"]`); if (!el) return;
   const rect=el.getBoundingClientRect();
   const f=document.createElement('div');
@@ -305,7 +328,8 @@ function floatNum(pid, amount, kind) {
   setTimeout(()=>f.remove(),1400);
 }
 
-function animPlayer(pid, type) {
+function animPlayer(pid, type, skipBroadcast=false) {
+  if (!skipBroadcast) broadcastEvent({type: 'animPlayer', pid, animType: type});
   const el=document.querySelector(`[data-pid="${pid}"]`); if (!el) return;
   el.classList.remove('anim-damage','anim-heal');
   void el.offsetWidth;
@@ -407,7 +431,8 @@ function playSound(type) {
   }
 }
 
-async function showSubtitle(text, type='effect') {
+async function showSubtitle(text, type='effect', skipBroadcast=false) {
+  if (!skipBroadcast) broadcastEvent({type: 'subtitle', msg: text, msgType: type});
   const overlay = document.getElementById('subtitle-text');
   if (!overlay) return;
   overlay.className = `subtitle-text type-${type}`;
@@ -419,7 +444,8 @@ async function showSubtitle(text, type='effect') {
   await delay(250); // Transition out delay
 }
 
-async function showDiceRollAnim(die, roll) {
+async function showDiceRollAnim(die, roll, skipBroadcast=false) {
+  if (!skipBroadcast) broadcastEvent({type: 'diceroll', die, roll});
   const overlay = document.getElementById('dice-roll-overlay');
   const nameEl = document.getElementById('dice-roll-name');
   const iconEl = document.getElementById('dice-roll-icon');
@@ -520,17 +546,30 @@ function renderOpponents() {
   if (!area||!localGameState) return;
   const { turnOrder, currentPlayerIndex }=localGameState; if (!turnOrder) return;
   area.innerHTML='';
+  let nextTurnId = null;
+  if (turnOrder && turnOrder.length > 0) {
+    let nextIdx = (currentPlayerIndex + 1) % turnOrder.length;
+    let loopCount = 0;
+    while(localPlayers[turnOrder[nextIdx]]?.eliminated && loopCount < turnOrder.length) {
+       nextIdx = (nextIdx + 1) % turnOrder.length;
+       loopCount++;
+    }
+    nextTurnId = turnOrder[nextIdx];
+  }
+
   for (const pid of turnOrder) {
     if (pid===myPlayerId) continue;
     const p=localPlayers[pid]; if (!p) continue;
     const isCurrent=turnOrder[currentPlayerIndex]===pid;
+    const isNext=nextTurnId===pid;
     const hpPct=Math.max(0,Math.min(100,(p.hp/Math.max(p.hp,10))*100));
     const bPct =Math.max(0,Math.min(100,((p.barrier||0)/14)*100));
     const icons=statusIcons(p.status||{});
     const card=document.createElement('div');
-    card.className=`opp-card${p.eliminated?' eliminated':''}${isCurrent?' current-turn':''}`;
+    card.className=`opp-card${p.eliminated?' eliminated':''}${isCurrent?' current-turn':''}${isNext?' next-turn':''}`;
     card.dataset.pid=pid;
     card.innerHTML=`
+      ${isNext ? '<div class="next-turn-badge">NEXT ⏭</div>' : ''}
       <div class="opp-name" title="${p.name}">${p.name}</div>
       <div class="hp-bar-wrap"><div class="hp-bar" style="width:${hpPct}%;background:${hpColor(p.hp)}"></div></div>
       <div class="bar-wrap"><div class="barrier-bar" style="width:${bPct}%"></div></div>
@@ -623,8 +662,18 @@ function updateGameUI() {
   document.getElementById('sd-badge')?.classList.toggle('active',!!suddenDeath);
   const ti=document.getElementById('turn-indicator');
   if (ti&&turnOrder) {
+    let nextIdx = (currentPlayerIndex + 1) % turnOrder.length;
+    let loopCount = 0;
+    while(localPlayers[turnOrder[nextIdx]]?.eliminated && loopCount < turnOrder.length) {
+       nextIdx = (nextIdx + 1) % turnOrder.length;
+       loopCount++;
+    }
+    const nid=turnOrder[nextIdx]; const nIsMe=nid===myPlayerId;
+    
     const cid=turnOrder[currentPlayerIndex]; const isMe=cid===myPlayerId;
-    ti.textContent=isMe?'⚡ あなたのターン！':`${localPlayers[cid]?.name||'?'} のターン`;
+    const cName = isMe ? 'あなた' : (localPlayers[cid]?.name||'?');
+    const nName = nIsMe ? 'あなた' : (localPlayers[nid]?.name||'?');
+    ti.innerHTML=`<span style="color:#55ff55">🟢 現在: ${cName}</span> <span style="font-size:0.8rem;color:#888;margin:0 8px;">➔</span> <span style="color:#ffff55">⏭ 次: ${nName}</span>`;
     ti.className=`turn-indicator${isMe?' my-turn':''}`;
   }
   renderOpponents(); renderSelf();
@@ -832,7 +881,10 @@ EH['barrier_heal']=async(die,roll,ctx,isEcho=false)=>{
 EH['compress']=async(die,roll,ctx,isEcho=false)=>{
   const tgtId=await pickTarget('圧縮の対象を選んでください',true);if(!tgtId)return;
   const hand=await getHand(tgtId);
-  const newHand=hand.map(d=>{const nf=getEffectiveFaces(d).map(f=>f>=4?Math.floor(Math.random()*3)+1:f);return {...d,compressedFaces:nf};});
+  const newHand=hand.map(d=>{
+    const nf=getEffectiveFaces(d).map(f=>f>=4?Math.floor(Math.random()*3)+1:f);
+    return {...d, compressedFaces:nf, compressedAtBarrelBonus: (d.barrelBonus||0)};
+  });
   await setHand(tgtId,newHand);if(tgtId===myPlayerId)myHand=newHand;
   await showSubtitle(`🗜️ 圧縮: ${localPlayers[tgtId]?.name||tgtId} の出目を低下！`, 'effect');
   pushPopup(`🗜️ 圧縮: ${localPlayers[tgtId]?.name||tgtId} の4以上を1〜3に変換！`,'effect');await addLog(`🗜️ 圧縮→${localPlayers[tgtId]?.name}`,'effect');
@@ -862,12 +914,12 @@ EH['rival']=async(die,roll,ctx,isEcho=false)=>{
 };
 EH['echo']=async(die,roll,ctx,isEcho=false)=>{
   if(isEcho)return;
-  const me = localPlayers[ctx.userId];
-  const curMult = me?.status?.echoNextTurn ? (me?.status?.echoMultiplier||2) : 1;
-  const nextMult = curMult * 2;
-  await setPlayerField(ctx.userId,{'status/echoNextTurn':true, 'status/echoMultiplier':nextMult});
-  await showSubtitle(`🏔️ やまびこ: 次のターン効果 ${nextMult} 倍！`, 'effect');
-  pushPopup(`🏔️ やまびこ: 次のターンのバフ・デバフが ${nextMult} 倍に増幅！`,'effect');await addLog(`🏔️ やまびこx${nextMult}`,'effect');
+  const players=await getPlayers(); const me=players[ctx.userId];
+  const curMult = me?.status?.echoMultiplierActive || 1;
+  const nextMult = curMult === 1 ? 2 : curMult * 2;
+  await setPlayerField(ctx.userId,{'status/echoActive':true, 'status/echoMultiplierActive':nextMult});
+  await showSubtitle(`🏔️ やまびこ: 以降の効果 ${nextMult} 倍！`, 'effect');
+  pushPopup(`🏔️ やまびこ: このターンのバフ・デバフが ${nextMult} 倍に増幅！`,'effect');await addLog(`🏔️ やまびこx${nextMult}`,'effect');
 };
 EH['gamble_heal']=async(die,roll,ctx,isEcho=false)=>{
   const r1=rollD6(),r2=rollD6(),r3=rollD6();const total=r1+r2+r3;
@@ -1034,16 +1086,41 @@ async function doStartPhase() {
     pushPopup('✨ 無敵状態が解除されました','effect');
     await addLog('✨ 無敵解除','effect');
   }
-  const echoActiveThisTurn = !!st.echoNextTurn;
-  const currentEchoMult = st.echoMultiplier || 2;
+
+  setMyTurnUI(true);
+  const btnUse = document.getElementById('btn-use-dice');
+  const btnRoll = document.getElementById('btn-roll-barrier');
+  if(btnUse) btnUse.style.display = 'none';
+  if(btnRoll) btnRoll.style.display = 'block';
+
+  await new Promise(resolve => {
+    if(!btnRoll) { resolve(); return; }
+    btnRoll.onclick = () => {
+      btnRoll.onclick = null;
+      btnRoll.style.display = 'none';
+      if(btnUse) btnUse.style.display = '';
+      resolve();
+    };
+  });
+
+  const bRecov = Math.floor(Math.random() * 3) + 1;
+  const newBarrier = (me.barrier || 0) + bRecov;
+
+  const bdDie = {cid:'normal', name:'バリア回復(1d3)'};
+  await showDiceRollAnim(bdDie, bRecov);
+
   await setPlayerField(myPlayerId,{
+    barrier: newBarrier,
     'status/invincibleTurns':invT,
     'status/rivalRoll':null,
-    'status/echoActive':echoActiveThisTurn,
-    'status/echoMultiplierActive': echoActiveThisTurn ? currentEchoMult : 1,
-    'status/echoNextTurn':false,
-    'status/echoMultiplier': 1
+    'status/echoActive':false,
+    'status/echoMultiplierActive': 1
   });
+
+  await showSubtitle(`🛡️ ターン開始: バリアが ${bRecov} 回復！`, 'barrier');
+  pushPopup(`🛡️ ターン開始: バリアが自然回復！ (+${bRecov})`,'barrier');
+  await addLog(`🛡️ バリア自然回復: +${bRecov}`,'barrier');
+  floatNum(myPlayerId, bRecov, 'barrier');
   renderSelf();
   await fbUpdate({phase:'action'},'gameState');
 }
@@ -1372,6 +1449,18 @@ async function startRematch() {
 function setupRoomListeners() {
   if(listenersActive)return;listenersActive=true;
 
+  // ─ イベント同期（他プレイヤーの演出を受信）
+  const startTs = Date.now();
+  listenChildAdded(R('events').orderByChild('ts').startAt(startTs), snap => {
+    const ev = snap.val();
+    if (!ev || ev.actorId === myPlayerId) return; // 自分のイベントはローカルで再生済みなので無視
+    if (ev.type === 'popup') pushPopup(ev.msg, ev.msgType, true);
+    if (ev.type === 'subtitle') showSubtitle(ev.msg, ev.msgType, true);
+    if (ev.type === 'diceroll') showDiceRollAnim(ev.die, ev.roll, true);
+    if (ev.type === 'floatNum') floatNum(ev.pid, ev.amount, ev.kind, true);
+    if (ev.type === 'animPlayer') animPlayer(ev.pid, ev.animType, true);
+  });
+
   // ─ メタ（画面遷移ドライバー）
   listen(R('meta'), async snap=>{
     localMeta=snap.val();if(!localMeta)return;
@@ -1539,7 +1628,7 @@ async function startGame() {
   for(let i=pids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pids[i],pids[j]]=[pids[j],pids[i]];}
   for(let i=0;i<pids.length;i++)await setPlayerField(pids[i],{hp:HP_MAX,barrier:0,eliminated:false,order:i,status:defaultStatus()});
   for(const pid of pids){const hand=Array.from({length:4},()=>mkDie(randDiceId()));await R('hands',pid).set({dice:hand,mulliganDone:false});}
-  for(const pid of pids){const b=rollD6()+rollD6();await setPlayerField(pid,{barrier:b});await addLog(`🛡 ${localPlayers[pid]?.name||pid} 初期バリア: ${b}`,'barrier');}
+  for(const pid of pids){const b=10;await setPlayerField(pid,{barrier:b});await addLog(`🛡 ${localPlayers[pid]?.name||pid} 初期バリア: ${b}`,'barrier');}
   window._handListenersReady=false;
   await fbSet({phase:'mulligan',round:1,currentPlayerIndex:0,turnOrder:pids,suddenDeath:false,draftPool:null,loot:null},'gameState');
   await R('meta').update({status:'mulligan'});

@@ -296,7 +296,7 @@
         <h3>📊 ステータス</h3>
         <ul>
           <li><strong>HP</strong>：初期値&上限 <strong class="rules-highlight">10</strong>（ギャンブルヒールのみ上限突破可）</li>
-          <li><strong>バリア</strong>：ターン開始時に2d6で設定。通常ダメージをHPより先に受ける</li>
+          <li><strong>バリア</strong>：ターン開始時に1d6回復（上限なし）。通常ダメージをHPより先に受ける</li>
           <li><strong>手札</strong>：常に最大4枚。他のプレイヤーには非公開</li>
         </ul>
       </div>
@@ -304,7 +304,7 @@
       <div class="rules-section">
         <h3>🔄 ターンの流れ</h3>
         <ol>
-          <li><strong>開始フェーズ</strong>：バリアリセット → 2d6でバリア設定 → 状態更新</li>
+          <li><strong>開始フェーズ</strong>：1d6でバリア回復 → 状態更新</li>
           <li><strong>アクションフェーズ</strong>：手札から最大2個を選んで使用（順番指定あり）</li>
           <li><strong>ドラフトフェーズ</strong>：4枚から2枚を選んで手札に加える</li>
           <li><strong>終了フェーズ</strong>：手札が5枚以上あれば4枚に調整（選んで捨てる）</li>
@@ -335,19 +335,19 @@
 
       <div class="rules-section">
         <h3>⚡ サドンデスモード</h3>
-        <p><strong style="color:#ff4444;">参加人数×4ラウンド</strong>を超えると突入。<br>
-        以降、ターン終了時に<span class="t-pen">自分のバリア値分の貫通ダメージ</span>を受け続ける。</p>
+        <p><strong style="color:#ff4444;">第10ラウンド</strong>を超えると突入。<br>
+        以降、ターン終了時に<span class="t-pen">サドンデスダイスによる1d3の貫通ダメージ</span>を受け続ける。</p>
       </div>
 
       <div class="rules-section">
         <h3>✨ 状態異常一覧</h3>
         <ul>
-          <li><strong>✨ 無敵</strong>：通常ダメージを無効化（貫通ダメージは防げない）</li>
-          <li><strong>☠️ 毒カウンター</strong>：次に自分を攻撃した相手に3ダメージ反射</li>
-          <li><strong>🏔️ やまびこ</strong>：次ターンのダイス効果（バフ・デバフ）が2回発動。ダメージ・回復は1回</li>
-          <li><strong>👑 下克上</strong>：ダイスを振るたびに1〜3が出る間再発動（最大4回追加）</li>
-          <li><strong>💢 同担拒否</strong>：記録した出目を出した相手に即6ダメージ</li>
-          <li><strong>📦 蓄積スタック</strong>：蓄積のダイスが保持する値。1が出た時に一括放出</li>
+          <li><strong>✨ 無敵</strong>：通常ダメージを無効化（次の自分のターン開始時まで継続。貫通ダメージは防げない）</li>
+          <li><strong>☠️ 毒カウンター</strong>：次の自分のターンまでに自分を攻撃した相手に3ダメージ（1ターン継続）</li>
+          <li><strong>🏔️ やまびこ</strong>：次ターンの特殊ダイス効果が2回発動。純粋なダメージや回復は1回（次ターン終了時まで継続）</li>
+          <li><strong>👑 下克上</strong>：1〜3のダメージ後、下克上状態に（発動ターンと次ターンまで計2ターン継続）。以降ダイスを振るたびに1〜3で再発動（最大4回追加）、4以上で失敗して効果終了</li>
+          <li><strong>💢 同担拒否</strong>：次の自分のターン開始時までに同じ出目を出した相手に6ダメージ（1ターン継続）</li>
+          <li><strong>📦 蓄積スタック</strong>：出目分のスタックを積む。1が出た時に全スタック分の貫通ダメージを一括放出</li>
           <li><strong>🛢️ 樽熟成</strong>：ターン開始時に全出目+1（永続・累積）</li>
         </ul>
       </div>

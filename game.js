@@ -588,7 +588,7 @@ function renderOpponents() {
 function statusIcons(st) {
   const list=[];
   if ((st.invincibleTurns||0)>0) list.push({i:`<span class="st-icon">✨<span class="st-badge">${st.invincibleTurns}</span></span>`,t:`無敵(${st.invincibleTurns}T)`});
-  if (st.poisonCounter)           list.push({i:'<span class="st-icon">☠️</span>',t:'毒カウンター'});
+  if (st.poisonCounter)           list.push({i:`<span class="st-icon">☠️<span class="st-badge">${st.poisonCounter}</span></span>`,t:`毒カウンター(x${st.poisonCounter})`});
   if (st.echoActive)              list.push({i:`<span class="st-icon">🏔️<span class="st-badge">${st.echoTurns||0}</span></span>`,t:`やまびこ(残り${st.echoTurns||0}T)`});
   if (st.dominanceActive)         list.push({i:`<span class="st-icon">👑<span class="st-badge">${st.dominanceTurns||0}</span></span>`,t:`下克上状態(残り${st.dominanceTurns||0}T)`});
   if (st.rivalRolls) {
